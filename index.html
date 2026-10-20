@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hypertrophy Log</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  input[type=number]{-moz-appearance:textfield}
+  .tabs::-webkit-scrollbar{display:none}.tabs{scrollbar-width:none}
+  .chk{appearance:none;width:2.5rem;height:2.5rem;border-radius:.6rem;border:2px solid #475569;background:#0f172a;display:grid;place-content:center;cursor:pointer;flex:none}
+  .chk:checked{background:#10b981;border-color:#10b981}
+  .chk:checked::after{content:"\f00c";font-family:"Font Awesome 6 Free";font-weight:900;color:#022c22;font-size:1rem}
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+<div class="max-w-3xl mx-auto px-4 pb-24">
+  <header class="pt-6 pb-4 flex items-center justify-between gap-3">
+    <h1 class="text-2xl font-extrabold tracking-tight"><i class="fa-solid fa-dumbbell text-amber-400 mr-2"></i>Hypertrophy Log</h1>
+    <button id="reset" class="text-sm text-slate-400 hover:text-red-400 px-3 py-2 rounded-lg border border-slate-800"><i class="fa-solid fa-rotate-left mr-1"></i>Reset data</button>
+  </header>
+
+  <select id="split" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-base font-semibold text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-500"></select>
+  <nav id="tabs" class="tabs flex gap-2 overflow-x-auto mt-3 pb-1"></nav>
+
+  <section class="mt-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-3">
+    <div>
+      <div class="text-sm text-slate-400">Session volume</div>
+      <div class="text-3xl font-extrabold text-emerald-400"><span id="vol">0</span> <span class="text-base font-semibold text-slate-400">kg·reps</span></div>
+      <div id="prog" class="text-sm text-slate-400 mt-1"></div>
+    </div>
+    <button id="done" class="px-4 py-3 rounded-xl font-bold text-sm"></button>
+  </section>
+
+  <h2 id="dayTitle" class="text-xl font-bold mt-6 mb-3 text-amber-400"></h2>
+  <div id="list" class="space-y-4"></div>
+</div>
+
+<div id="modal" class="hidden fixed inset-0 bg-black/70 items-center justify-center p-4 z-50">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full">
+    <h3 class="text-lg font-bold">Reset all data?</h3>
+    <p class="text-slate-400 mt-2 text-sm">This deletes every logged weight, rep, and completed set on this device. It can’t be undone.</p>
+    <div class="flex gap-3 mt-5">
+      <button id="no" class="flex-1 py-3 rounded-xl bg-slate-800 font-semibold">Keep data</button>
+      <button id="yes" class="flex-1 py-3 rounded-xl bg-red-600 font-semibold">Delete everything</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Exercise format: "Name|sets|reps|RIR(optional)"
+const P = (days) => days.map(([name, ex]) => ({ name, ex: ex.map(s => { const [n, sets, reps, rir] = s.split('|'); return { n, sets: +sets, reps, rir }; }) }));
+
+const PROGRAMS = {
+  ul: { label: 'Upper / Lower Split (4 Days)', days: P([
+    ['Upper A · Chest & Lats', ['Machine / Flat Barbell Chest Press|3|6–12|1–2','Incline Dumbbell Press or Cable Flye|3|8–15|1','Lat Pulldown|3|6–12|1–2','Chest-Supported Row|3|8–15|1','Overhead Shoulder Press|3|8–12|1','Cable Lateral Raise|4|12–15|0–1','Triceps Overhead Extension|3|10–15|1','Incline Dumbbell Curl|3|10–15|1']],
+    ['Lower A · Quad Dominant', ['Leg Press / Hack Squat|3|6–12|1–2','Leg Extension|3|10–20|0–1','Romanian Deadlift|3|8–12|2','Seated Leg Curl|3|10–15|1','Standing Calf Raise|4|10–20|0–1','Ab Machine or Cable Crunch|3|12–15|1']],
+    ['Upper B · Delts, Back & Arms', ['Seated Dumbbell or Machine Shoulder Press|3|6–12|1–2','Low Cable Row|3|8–12|1','Incline Press|3|8–12|1','Neutral Grip Lat Pulldown / Pull-ups|3|8–12|1','Rear Delt Reverse Flye|4|12–20|0–1','Dumbbell / Cable Lateral Raise|4|12–15|0–1','Preacher Curl|3|10–15|0–1','Cable Triceps Pushdown|3|10–15|0–1']],
+    ['Lower B · Posterior Chain', ['Lying / Seated Leg Curl|4|8–15|1','Squat or Foot-High Leg Press|3|8–12|1–2','Walking Lunges or Split Squats|3|10–12 /leg|1','Leg Extension|3|12–20|1','Seated / Standing Calf Raise|4|12–20|0','Hanging Leg Raise|3|12–15|1']]
+  ])},
+  ppl: { label: 'Push / Pull / Legs (6 Days)', days: P([
+    ['Push A · Chest & Triceps', ['Flat Barbell / Dumbbell Bench Press|3|6–10','Incline Dumbbell Press|3|8–12','Seated Shoulder Press|3|8–12','Cable Lateral Raise|4|12–15','Skullcrushers or Overhead Cable Extension|3|10–12','Cable Triceps Pushdown|3|12–15']],
+    ['Pull A · Lats & Biceps', ['Lat Pulldown or Weighted Pull-ups|3|6–10','Chest-Supported T-Bar / Cable Row|3|8–12','Seated Cable Row|3|10–12','Face Pulls or Rear Delt Flyes|4|12–15','Standing Barbell / EZ-Bar Curl|3|8–11','Hammer Curls|3|10–12']],
+    ['Legs A · Quad Focus', ['Back Squat or Hack Squat|3|6–10','Leg Press|3|8–12','Leg Extension|3|12–15','Lying Leg Curl|3|10–12','Standing Calf Raise|4|12–15','Cable / Machine Crunch|3|12–15']],
+    ['Push B · Delts & Upper Chest', ['Standing / Seated Overhead Press|3|6–10','Incline Barbell Press|3|8–12','Cable Chest Flyes|3|12–15','Lean-Away Lateral Raise|4|12–15','Single-Arm Cable Triceps Extension|3|10–12','Dips or Machine Dip|3|10–12']],
+    ['Pull B · Mid-Back & Upper Lats', ['Barbell Row or Chest-Supported Row|3|6–10','Neutral Grip Pulldown|3|8–12','Single-Arm Cable Row|3|10–12','Reverse Pec Deck Flye|4|12–15','Incline Dumbbell Curl|3|10–12','Cable Bayesian Curl|3|12–15']],
+    ['Legs B · Hamstrings & Glutes', ['Romanian Deadlift (RDL)|3|6–10','Seated Leg Curl|3|10–12','Walking Lunges or Bulgarian Split Squats|3|10–12 /leg','Leg Extension|3|12–15','Seated Calf Raise|4|12–15','Hanging Leg Raise|3|12–15']]
+  ])},
+  arn: { label: 'Arnold Split (6 Days)', days: P([
+    ['Chest & Back A', ['Flat Barbell Bench Press|3|6–10','Barbell Row|3|6–10','Incline Dumbbell Press|3|8–12','Lat Pulldown or Pull-ups|3|8–12','Cable Chest Flyes|3|12–15','Straight-Arm Cable Pulldown|3|12–15']],
+    ['Shoulders & Arms A', ['Seated Overhead Dumbbell Press|3|6–10','Side Lateral Raise|4|12–15','Rear Delt Reverse Flyes|4|12–15','Barbell or EZ-Bar Biceps Curl|3|8–12','Triceps Overhead Extension|3|8–12','Incline DB Hammer Curls|3|10–12','Rope Triceps Pushdown|3|10–12']],
+    ['Legs & Abs A', ['Barbell Squat or Hack Squat|3|6–10','Romanian Deadlift|3|8–12','Leg Extension|3|12–15','Lying Leg Curl|3|10–12','Standing Calf Raise|4|12–15','Decline Sit-ups / Hanging Leg Raise|3|12–15']],
+    ['Chest & Back B', ['Incline Barbell Press|3|6–10','Seated Cable Row|3|8–12','Flat Dumbbell Press|3|8–12','Neutral Grip Lat Pulldown|3|8–12','Cable Crossover Flyes|3|12–15','Chest-Supported T-Bar Row|3|10–12']],
+    ['Shoulders & Arms B', ['Standing Overhead Barbell Press|3|6–10','Cable Lateral Raise|4|12–15','Face Pulls|4|12–15','Preacher Curl|3|8–12','Close-Grip Bench Press or Dips|3|8–12','Concentration Curls|3|10–12','Single-Arm Overhead Triceps Extension|3|10–12']],
+    ['Legs & Abs B', ['Leg Press|3|8–12','Seated Leg Curl|3|8–12','Bulgarian Split Squat|3|10–12 /leg','Leg Extension|3|12–15','Seated Calf Raise|4|12–15','Ab Machine Crunch|3|12–15']]
+  ])}
+};
+
+const KEY = 'hypertrophyLog.v1';
+let S = { split: 'ul', day: 0, logs: {}, complete: {} };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && PROGRAMS[s.split]) S = Object.assign(S, s); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const dayKey = () => S.split + ':' + S.day;
+const prog = () => PROGRAMS[S.split];
+const day = () => prog().days[S.day] || prog().days[0];
+function sets(ei, si) {
+  const k = dayKey(); S.logs[k] = S.logs[k] || {};
+  S.logs[k][ei] = S.logs[k][ei] || [];
+  return S.logs[k][ei][si] = S.logs[k][ei][si] || { w: '', r: '', d: false };
+}
+const peek = (ei, si) => ((S.logs[dayKey()] || {})[ei] || [])[si] || { w: '', r: '', d: false };
+
+function volume() {
+  let v = 0, done = 0, total = 0;
+  day().ex.forEach((e, ei) => { for (let si = 0; si < e.sets; si++) {
+    const s = peek(ei, si); total++;
+    if (s.d) { done++; v += (parseFloat(s.w) || 0) * (parseFloat(s.r) || 0); }
+  }});
+  return { v, done, total };
+}
+
+function updateMetrics() {
+  const m = volume();
+  $('vol').textContent = Math.round(m.v).toLocaleString();
+  $('prog').textContent = m.done + ' of ' + m.total + ' sets done';
+  const c = !!S.complete[dayKey()];
+  const b = $('done');
+  b.className = 'px-4 py-3 rounded-xl font-bold text-sm ' + (c ? 'bg-emerald-500 text-emerald-950' : 'bg-amber-500 text-slate-950');
+  b.innerHTML = c ? '<i class="fa-solid fa-circle-check mr-1"></i>Completed' : '<i class="fa-regular fa-circle mr-1"></i>Mark complete';
+}
+
+function render() {
+  const sel = $('split');
+  sel.innerHTML = Object.entries(PROGRAMS).map(([k, p]) => `<option value="${k}" ${k === S.split ? 'selected' : ''}>${p.label}</option>`).join('');
+  $('tabs').innerHTML = prog().days.map((d, i) => {
+    const on = i === S.day, c = S.complete[S.split + ':' + i];
+    return `<button data-day="${i}" class="shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border ${on ? 'bg-amber-500 text-slate-950 border-amber-500' : 'bg-slate-900 text-slate-300 border-slate-800'}">${c ? '<i class="fa-solid fa-check text-emerald-400 mr-1"></i>' : ''}Day ${i + 1}</button>`;
+  }).join('');
+  $('dayTitle').textContent = day().name;
+  $('list').innerHTML = day().ex.map((e, ei) => {
+    let rows = '';
+    for (let si = 0; si < e.sets; si++) {
+      const s = peek(ei, si);
+      rows += `<div class="flex items-center gap-2">
+        <span class="w-12 text-sm text-slate-400 shrink-0">Set ${si + 1}</span>
+        <input type="number" inputmode="decimal" min="0" step="any" placeholder="kg" aria-label="Weight" data-e="${ei}" data-s="${si}" data-f="w" value="${esc(s.w)}" class="inp w-full min-w-0 h-11 bg-slate-950 border border-slate-700 rounded-lg px-3 text-center text-lg focus:outline-none focus:border-amber-400">
+        <span class="text-slate-600">×</span>
+        <input type="number" inputmode="numeric" min="0" step="1" placeholder="reps" aria-label="Reps" data-e="${ei}" data-s="${si}" data-f="r" value="${esc(s.r)}" class="inp w-full min-w-0 h-11 bg-slate-950 border border-slate-700 rounded-lg px-3 text-center text-lg focus:outline-none focus:border-amber-400">
+        <input type="checkbox" class="chk" aria-label="Set ${si + 1} complete" data-e="${ei}" data-s="${si}" ${s.d ? 'checked' : ''}>
+      </div>`;
+    }
+    return `<article class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+      <h3 class="font-bold">${esc(e.n)}</h3>
+      <p class="text-sm text-slate-400 mb-3">${e.sets} sets · ${esc(e.reps)} reps${e.rir ? ' · RIR ' + esc(e.rir) : ''}</p>
+      <div class="space-y-2">${rows}</div></article>`;
+  }).join('');
+  updateMetrics();
+}
+
+$('split').addEventListener('change', e => { S.split = e.target.value; S.day = 0; save(); render(); });
+$('tabs').addEventListener('click', e => { const b = e.target.closest('[data-day]'); if (b) { S.day = +b.dataset.day; save(); render(); window.scrollTo({ top: 0 }); } });
+$('list').addEventListener('input', e => { const t = e.target; if (t.classList.contains('inp')) { sets(+t.dataset.e, +t.dataset.s)[t.dataset.f] = t.value; save(); updateMetrics(); } });
+$('list').addEventListener('change', e => { const t = e.target; if (t.classList.contains('chk')) { sets(+t.dataset.e, +t.dataset.s).d = t.checked; save(); updateMetrics(); } });
+$('done').addEventListener('click', () => { S.complete[dayKey()] = !S.complete[dayKey()]; save(); render(); });
+const modal = $('modal');
+$('reset').addEventListener('click', () => { modal.classList.remove('hidden'); modal.classList.add('flex'); });
+$('no').addEventListener('click', () => { modal.classList.add('hidden'); modal.classList.remove('flex'); });
+$('yes').addEventListener('click', () => {
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  S = { split: 'ul', day: 0, logs: {}, complete: {} };
+  modal.classList.add('hidden'); modal.classList.remove('flex'); render();
+});
+render();
+</script>
+</body>
+</html>
